@@ -1,0 +1,9 @@
+requests
+python-dotenv
+psycopg2-binary
+minio
+pyspark
+scikit-learn
+implicit
+flask
+boto3
