@@ -1,115 +1,118 @@
 import json
 import requests
-import boto3
-import time
-from pathlib import Path
 from spotify_auth import refresh_access_token
-from datetime import datetime
+import datetime
 from config import MINIO_ACCESS_KEY, MINIO_BUCKET, MINIO_ENDPOINT, MINIO_SECRET_KEY
-
-# Initialize MinIO client (S3-compatible)
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=MINIO_ENDPOINT,
-    aws_access_key_id=MINIO_ACCESS_KEY,
-    aws_secret_access_key=MINIO_SECRET_KEY
-)
-
-# Ensure bucket exists
-try:
-    s3_client.head_bucket(Bucket=MINIO_BUCKET)
-except:
-    s3_client.create_bucket(Bucket=MINIO_BUCKET)
+from minio import Minio
+from io import BytesIO
+import io
 
 ACCESS_TOKEN = refresh_access_token()
-BASE_URL = "https://api.spotify.com/v1"
 
-def make_request(url, params=None):
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
-    r = requests.get(url, headers=headers, params=params)
-    if r.status_code != 200:
-        raise Exception(f"Error {r.status_code}: {r.text}")
-    return r.json()
-
-def save_json_minio(data, key):
-    """Save JSON to MinIO at a given key"""
-    s3_client.put_object(
-        Bucket=MINIO_BUCKET,
-        Key=key,
-        Body=json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"),
-        ContentType="application/json"
+def get_yesterday_timestamp_ms():
+    """Get yesterday's start time in milliseconds (for Spotify API)."""
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    yesterday_midnight = datetime.datetime(
+        year=yesterday.year, month=yesterday.month, day=yesterday.day
     )
-    print(f"Saved to MinIO: {key}")
+    return int(yesterday_midnight.timestamp() * 1000), yesterday
 
-def load_json_minio(key):
-    """Load JSON from MinIO"""
+def fetch_recently_played(after_ms):
+    """Fetch recently played tracks from Spotify API."""
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}"
+    }
+    params = {
+        "after": after_ms,
+        "limit": 50
+    }
+    url = "https://api.spotify.com/v1/me/player/recently-played"
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code != 200:
+        raise Exception(f"Spotify API error {response.status_code}: {response.text}")
+    
+    data = response.json()
+    
+    if "items" not in data:
+        raise Exception("Unexpected response format from Spotify API")
+    
+    records = []
+    
+    # Extract track data
+    for item in data["items"]:
+        track = item["track"]
+        record = {
+            "song_id": track["id"],
+            "song_title": track["name"],
+            "artist_name": track["artists"][0]["name"],
+            "artist_id": track["artists"][0]["id"],
+            "played_at": item["played_at"],
+            "song_duration_ms": track["duration_ms"]
+        }
+        records.append(record)
+    
+    return records
+
+def upload_to_minio(client, bucket_name, object_path, data):
+    """Upload JSON data to MinIO."""
+    if not client.bucket_exists(bucket_name):
+        client.make_bucket(bucket_name)
+
+    data_bytes = json.dumps(data, indent=2).encode("utf-8")
+    data_stream = BytesIO(data_bytes)
+
+    client.put_object(
+        bucket_name=bucket_name,
+        object_name=object_path,
+        data=data_stream,
+        length=len(data_bytes),
+        content_type="application/json"
+    )
+    print(f"Uploaded to MinIO: s3a://{bucket_name}/{object_path}")
+    
+def write_marker(minio_client, bucket_name, object_name):
+    # Empty file as a success flag
+    marker_data = b""
+    minio_client.put_object(
+        bucket_name,
+        object_name,
+        io.BytesIO(marker_data),
+        length=0
+    )
+    print(f"Marker file created: {object_name}")
+
+def marker_exists(minio_client, bucket_name, object_name):
     try:
-        obj = s3_client.get_object(Bucket=MINIO_BUCKET, Key=key)
-        return json.loads(obj["Body"].read().decode("utf-8"))
-    except s3_client.exceptions.NoSuchKey:
-        return None
-
-# API Calls
-def get_followed_artists():
-    url = f"{BASE_URL}/me/following"
-    params = {"type": "artist", "limit": 50}
-    return make_request(url, params)
-
-def get_recently_played_incremental(after_ms):
-    url = f"{BASE_URL}/me/player/recently-played"
-    params = {"after": after_ms, "limit": 50}
-    return make_request(url, params)
-
-def get_saved_tracks(limit=50):
-    url = f"{BASE_URL}/me/tracks"
-    params = {"limit": limit}
-    return make_request(url, params)
-
+        minio_client.stat_object(bucket_name, object_name)
+        return True
+    except Exception:
+        return False
 
 if __name__ == "__main__":
-    print("Extracting data from Spotify...")
+    # Get yesterday timestamp & date
+    after_ms, yesterday_date = get_yesterday_timestamp_ms()
+    date_prefix = yesterday_date.strftime("%Y/%m/%d")
 
-    # Load last timestamp from metadata in MinIO
-    metadata_key = "metadata/spotify_incremental.json"
-    metadata = load_json_minio(metadata_key)
-    if metadata and "last_timestamp_ms" in metadata:
-        after_ms = metadata["last_timestamp_ms"]
-        print(f"Resuming from last timestamp: {after_ms}")
+    # MinIO client
+    minio_client = Minio(
+        MINIO_ENDPOINT,
+        access_key=MINIO_ACCESS_KEY,
+        secret_key=MINIO_SECRET_KEY,
+        secure=False
+    )
+    
+    marker_path = f"raw/{date_prefix}/_SUCCESS"
+    if marker_exists(minio_client, MINIO_BUCKET, marker_path):
+        print(f"Data for {date_prefix} already exists. Skipping extraction.")
     else:
-        after_ms = int((time.time() - 24*60*60) * 1000)  # default 24h ago
-        print("No metadata found. Starting from last 24h.")
-        
+        # Fetch from Spotify
+        print(f"Fetching recently played tracks after {after_ms} ({yesterday_date})...")
+        records = fetch_recently_played(after_ms)
 
-    # Fetch followed artists
-    followed_artists = get_followed_artists()
-    date_prefix = datetime.utcnow().strftime("%Y/%m/%d")
-    save_json_minio(followed_artists, f"raw/{date_prefix}/followed_artists.json")
+        # Upload JSON
+        object_name = f"raw/{date_prefix}/recently_played.json"
+        upload_to_minio(minio_client, MINIO_BUCKET, object_name, records)
 
-    # Fetch incremental recently played tracks
-    timestamp_str = datetime.utcnow().strftime("%H%M%S")
-    recently_played = get_recently_played_incremental(after_ms)
-    save_json_minio(recently_played, f"raw/{date_prefix}/{timestamp_str}_recently_played.json")
-
-    track_items = recently_played.get("items", [])
-    if track_items:
-        new_last_timestamp_ms = max(item["played_at"] for item in track_items)
-        new_last_timestamp_ms = int(datetime.fromisoformat(new_last_timestamp_ms.replace("Z", "+00:00")).timestamp() * 1000)
-
-        # Update metadata in MinIO
-        new_metadata = {"last_timestamp_ms": new_last_timestamp_ms}
-        save_json_minio(new_metadata, metadata_key)
-
-    # Fetch saved tracks
-    saved_tracks = get_saved_tracks()
-    save_json_minio(saved_tracks, f"raw/{date_prefix}/saved_tracks.json")
-
-    # Write logs in MinIO
-    log_entry = {
-        "run_time_utc": datetime.utcnow().isoformat(),
-        "recently_played_count": len(track_items),
-        "saved_tracks_count": len(saved_tracks.get("items", []))
-    }
-    log_key = f"logs/{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
-    save_json_minio(log_entry, log_key)
-
-    print("Extraction completed!")
+        # Upload marker
+        write_marker(minio_client, MINIO_BUCKET, marker_path)
