@@ -7,3 +7,6 @@ scikit-learn
 implicit
 flask
 boto3
+pandas
+pyarrow
+fastparquet

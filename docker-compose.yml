@@ -23,6 +23,20 @@ services:
       - minio_data:/data
     command: server /data --console-address ":9001"
 
+  pgadmin:
+      image: dpage/pgadmin4:latest
+      container_name: pgadmin
+      environment:
+        PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+        PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      ports:
+        - "8080:80"
+      depends_on:
+        - postgres
+      volumes:
+        - pgadmindata:/var/lib/pgadmin
+
 volumes:
   pgdata:
   minio_data:
+  pgadmindata:
