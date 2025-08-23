@@ -1,18 +1,18 @@
 -- Dimensions
-CREATE TABLE dim_artist (
+CREATE TABLE IF NOT EXISTS dim_artist (
     artist_key SERIAL PRIMARY KEY,
     artist_id VARCHAR UNIQUE NOT NULL,
     artist_name VARCHAR NOT NULL
 );
 
-CREATE TABLE dim_song (
+CREATE TABLE IF NOT EXISTS dim_song (
     song_key SERIAL PRIMARY KEY,
     song_id VARCHAR UNIQUE NOT NULL,
     song_title VARCHAR NOT NULL,
     song_duration_ms INT
 );
 
-CREATE TABLE dim_date (
+CREATE TABLE IF NOT EXISTS dim_date (
     date_key SERIAL PRIMARY KEY,
     year INT,
     month INT,
@@ -27,7 +27,7 @@ CREATE TABLE dim_date (
 );
 
 -- Fact
-CREATE TABLE fact_play_summary (
+CREATE TABLE IF NOT EXISTS fact_play_summary (
     play_id SERIAL PRIMARY KEY,
     song_key INT REFERENCES dim_song (song_key),
     artist_key INT REFERENCES dim_artist (artist_key),

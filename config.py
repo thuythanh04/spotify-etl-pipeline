@@ -3,8 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
-# Look for .env in project root
-env_path = Path(__file__).resolve().parents[0] / ".env"
+env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(env_path)
 
 POSTGRES_USER = os.getenv("POSTGRES_USER")

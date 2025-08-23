@@ -1,55 +1,71 @@
 import pandas as pd
 from io import BytesIO
-from minio import Minio
+import logging
+from etl.utils.db import get_connection
+from etl.utils.fact_loader import insert_fact_play_summary
+from etl.utils.dim_loader import upsert_artist, upsert_song, upsert_date
+from etl.utils.minio_utils import init_minio_client
 from config import MINIO_BUCKET
-from datetime import datetime, timedelta
-from utils.fact_loader import insert_fact_play_summary
-from utils.dim_loader import upsert_artist, upsert_song, upsert_date
-from utils.db import get_connection
-from utils.minio_utils import init_minio_client
 
-def get_yesterday_date():
-    yesterday = datetime.now() - timedelta(days=1)
-    return yesterday.strftime("%Y/%m/%d")
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def download_parquet_as_df(client, bucket, object_path):
-    response = client.get_object(bucket, object_path)
-    df = pd.read_parquet(BytesIO(response.read()))
-    response.close()
-    response.release_conn()
+def download_processed(date_prefix: str) -> pd.DataFrame:
+    logger.info(f"Downloading processed data for date_prefix={date_prefix}")
+    client = init_minio_client()
+    path = f"processed/{date_prefix}/recently_played.parquet"
+
+    try:
+        response = client.get_object(MINIO_BUCKET, path)
+        df = pd.read_parquet(BytesIO(response.read()))
+        logger.info(f"Downloaded {len(df)} rows from {path}")
+    except Exception as e:
+        logger.error(f"Failed to download processed data from {path}", exc_info=True)
+        raise
+    finally:
+        response.close()
+        response.release_conn()
+
     return df
 
-def main():
-    # Init MinIO + Postgres
-    minio_client = init_minio_client()
+
+def load_to_postgres(df: pd.DataFrame):
+    logger.info(f"Loading dataframe with {len(df)} rows into Postgres")
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Load parquet
-    date_prefix = get_yesterday_date()
-    parquet_path = f"processed/{date_prefix}/recently_played.parquet"
-    print(f"Loading parquet from MinIO: {parquet_path}")
-    df = download_parquet_as_df(minio_client, MINIO_BUCKET, parquet_path)
+    try:
+        for idx, row in df.iterrows():
+            logger.debug(f"Processing row {idx}: {row.to_dict()}")
 
-    # Insert into star schema
-    for _, row in df.iterrows():
-        # dim_artist
-        artist_key = upsert_artist(cursor, row["artist_id"], row["artist_name"])
+            try:
+                artist_key = upsert_artist(cursor, row["artist_id"], row["artist_name"])
+                song_key = upsert_song(cursor, row["song_id"], row["song_title"], row["song_duration_ms"])
+                date_key = upsert_date(cursor, row["year"], row["month"], row["hour_of_day"], row["day_of_week"])
 
-        # dim_song
-        song_key = upsert_song(cursor, row["song_id"], row["song_title"], row["song_duration_ms"])
+                if date_key:
+                    insert_fact_play_summary(
+                        cursor,
+                        song_key,
+                        artist_key,
+                        date_key,
+                        1,
+                        row["song_duration_ms"],
+                    )
+                    logger.debug(f"Inserted fact for song_id={row['song_id']}, artist_id={row['artist_id']}")
+            except Exception as e:
+                logger.error(f"Failed to process row {idx}", exc_info=True)
+                raise
 
-        # dim_date
-        date_key = upsert_date(cursor, row["year"], row["month"], row["hour_of_day"], row["day_of_week"])
+        conn.commit()
+        logger.info("Postgres load committed successfully")
 
-        # fact_play_history
-        if date_key:
-            play_id = insert_fact_play_summary(cursor, song_key, artist_key, date_key, 1, row["song_duration_ms"])
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("Load completed!")
-
-if __name__ == "__main__":
-    main()
+    except Exception as e:
+        conn.rollback()
+        logger.error("Error during Postgres load, rolled back transaction", exc_info=True)
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+        logger.info("Postgres connection closed")

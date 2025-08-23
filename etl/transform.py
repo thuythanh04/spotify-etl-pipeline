@@ -1,105 +1,101 @@
 import json
 import pandas as pd
 from io import BytesIO
-from minio import Minio
 from datetime import datetime, timedelta
+import logging
 from config import MINIO_BUCKET
-from utils.minio_utils import init_minio_client
+from etl.utils.minio_utils import init_minio_client
 
-def get_yesterday_date() -> tuple[str, str]:
-    """Return yesterday's date in path and string formats."""
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def get_yesterday_date() -> str:
     yesterday = datetime.now() - timedelta(days=1)
-    return yesterday.strftime("%Y/%m/%d"), yesterday
+    date_str = yesterday.strftime("%Y/%m/%d")
+    logger.info(f"Computed yesterday's date prefix: {date_str}")
+    return date_str
 
-def download_json_as_df(client: Minio, bucket: str, object_path: str) -> pd.DataFrame:
-    """Download a JSON object from MinIO and return as DataFrame."""
+
+def download_raw(date_prefix: str) -> pd.DataFrame:
+    logger.info(f"Downloading raw data for date_prefix={date_prefix}")
+    client = init_minio_client()
+    raw_path = f"raw/{date_prefix}/recently_played.json"
+
     try:
-        response = client.get_object(bucket, object_path)
+        response = client.get_object(MINIO_BUCKET, raw_path)
         data = json.loads(response.read().decode("utf-8"))
+        logger.info(f"Downloaded raw JSON with {len(data)} records from {raw_path}")
+    except Exception as e:
+        logger.error(f"Failed to download raw data from {raw_path}", exc_info=True)
+        raise
+    finally:
         response.close()
         response.release_conn()
-        return pd.DataFrame(data)
-    except Exception as e:
-        raise RuntimeError(f"Failed to download {object_path}: {e}")
+
+    return pd.DataFrame(data)
+
 
 def validate_and_clean(df: pd.DataFrame) -> pd.DataFrame:
-    """Validate and clean the DataFrame."""
+    logger.info("Validating and cleaning dataframe")
     if df.empty:
-        raise ValueError("Downloaded dataset is empty! Nothing to transform.")
+        logger.error("Dataset is empty")
+        raise ValueError("Dataset empty!")
+
+    before = len(df)
     df = df.dropna(how="all")
-    for col in ["song_title", "artist_name"]:
-        if col in df.columns:
-            df[col] = df[col].fillna("N/A")
     df = df.dropna(subset=["song_duration_ms", "played_at"], how="any")
+    after = len(df)
+    logger.info(f"Dropped {before - after} invalid rows; {after} rows remain")
     return df
 
-def transform_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Transform the raw DataFrame."""
+
+def transform(df: pd.DataFrame) -> pd.DataFrame:
+    logger.info("Transforming dataframe")
     df = validate_and_clean(df)
+
     df["song_duration_ms"] = df["song_duration_ms"].astype(int)
     df["played_at"] = pd.to_datetime(df["played_at"], errors="coerce")
+
+    before = len(df)
     df = df.drop_duplicates(subset=["song_id", "played_at"])
+    after = len(df)
+    logger.info(f"Removed {before - after} duplicate rows; {after} rows remain")
+
     df["year"] = df["played_at"].dt.year
     df["month"] = df["played_at"].dt.month
     df["hour_of_day"] = df["played_at"].dt.hour
     df["day_of_week"] = df["played_at"].dt.day_name()
-    df = df.drop(columns=["played_at"])
-    return df
 
-def upload_parquet_to_minio(client: Minio, bucket: str, object_path: str, df: pd.DataFrame):
-    """Upload DataFrame as Parquet to MinIO."""
-    buffer = BytesIO()
-    df.to_parquet(buffer, index=False)
-    buffer.seek(0)
-    client.put_object(
-        bucket_name=bucket,
-        object_name=object_path,
-        data=buffer,
-        length=buffer.getbuffer().nbytes,
-        content_type="application/parquet"
-    )
-    print(f"Uploaded transformed data to MinIO: s3a://{bucket}/{object_path}")
+    logger.info("Transformation complete")
+    return df.drop(columns=["played_at"])
 
-def write_success_marker(client: Minio, bucket: str, object_path: str):
-    """Write a _SUCCESS marker file to MinIO."""
-    data = BytesIO(b"")
-    client.put_object(
-        bucket_name=bucket,
-        object_name=object_path,
-        data=data,
-        length=0,
-        content_type="text/plain"
-    )
-    print(f"Written marker file: s3a://{bucket}/{object_path}")
 
-def success_marker_exists(client: Minio, bucket: str, object_path: str) -> bool:
-    """Check if the _SUCCESS marker file exists in MinIO."""
+def upload_transformed(df: pd.DataFrame, date_prefix: str):
+    logger.info(f"Uploading transformed dataframe with {len(df)} rows for date_prefix={date_prefix}")
+    client = init_minio_client()
+    path = f"processed/{date_prefix}/recently_played.parquet"
+
     try:
-        client.stat_object(bucket, object_path)
-        return True
+        buf = BytesIO()
+        df.to_parquet(buf, index=False)
+        buf.seek(0)
+        client.put_object(
+            MINIO_BUCKET,
+            path,
+            buf,
+            buf.getbuffer().nbytes,
+            content_type="application/parquet",
+        )
+        client.put_object(
+            MINIO_BUCKET,
+            f"processed/{date_prefix}/_SUCCESS",
+            BytesIO(b""),
+            0,
+            content_type="text/plain",
+        )
+        logger.info(f"Uploaded parquet and _SUCCESS marker to {path}")
     except Exception:
-        return False
-
-def main():
-    minio_client = init_minio_client()
-    date_prefix, _ = get_yesterday_date()
-    raw_path = f"raw/{date_prefix}/recently_played.json"
-    processed_path = f"processed/{date_prefix}/recently_played.parquet"
-    marker_path = f"processed/{date_prefix}/_SUCCESS"
-
-    # Check for _SUCCESS marker before processing
-    if success_marker_exists(minio_client, MINIO_BUCKET, marker_path):
-        print(f"Processed data for {date_prefix} already exists. Skipping transformation.")
-        return
-
-    print(f"Reading raw data: {raw_path}")
-    df_raw = download_json_as_df(minio_client, MINIO_BUCKET, raw_path)
-
-    print("Validating and transforming data...")
-    df_transformed = transform_data(df_raw)
-
-    upload_parquet_to_minio(minio_client, MINIO_BUCKET, processed_path, df_transformed)
-    write_success_marker(minio_client, MINIO_BUCKET, marker_path)
-
-if __name__ == "__main__":
-    main()
+        logger.error("Failed to upload transformed data", exc_info=True)
+        raise

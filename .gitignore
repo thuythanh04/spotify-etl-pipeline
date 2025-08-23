@@ -3,3 +3,6 @@
 *data
 *__pycache__
 auth.py
+logs/
+test.py
+*.cfg
