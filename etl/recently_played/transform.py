@@ -2,6 +2,7 @@ import json
 import pandas as pd
 from io import BytesIO
 from datetime import datetime, timedelta
+import datetime
 import logging
 from config import MINIO_BUCKET
 from etl.utils.minio_utils import init_minio_client
@@ -11,11 +12,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def get_yesterday_date() -> str:
-    yesterday = datetime.now() - timedelta(days=1)
-    date_str = yesterday.strftime("%Y/%m/%d")
-    logger.info(f"Computed yesterday's date prefix: {date_str}")
-    return date_str
+def get_last_window_timestamp_ms(hours: int = 12) -> tuple[int, datetime.datetime]:
+    """
+    Returns the timestamp (ms) for the start of the last ETL window,
+    based on the given interval in hours.
+    """
+    now = datetime.datetime.now()
+    window_start = now - datetime.timedelta(hours=hours)
+
+    logging.info(f"Computed ETL window start: {window_start}")
+    return int(window_start.timestamp() * 1000), window_start
 
 
 def download_raw(date_prefix: str) -> pd.DataFrame:
@@ -69,7 +75,7 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     df["day_of_week"] = df["played_at"].dt.day_name()
 
     logger.info("Transformation complete")
-    return df.drop(columns=["played_at"])
+    return df
 
 
 def upload_transformed(df: pd.DataFrame, date_prefix: str):

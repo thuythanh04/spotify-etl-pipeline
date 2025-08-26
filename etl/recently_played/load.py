@@ -29,7 +29,6 @@ def download_processed(date_prefix: str) -> pd.DataFrame:
 
     return df
 
-
 def load_to_postgres(df: pd.DataFrame):
     logger.info(f"Loading dataframe with {len(df)} rows into Postgres")
     conn = get_connection()
@@ -42,7 +41,16 @@ def load_to_postgres(df: pd.DataFrame):
             try:
                 artist_key = upsert_artist(cursor, row["artist_id"], row["artist_name"])
                 song_key = upsert_song(cursor, row["song_id"], row["song_title"], row["song_duration_ms"])
-                date_key = upsert_date(cursor, row["year"], row["month"], row["hour_of_day"], row["day_of_week"])
+
+                played_at = pd.to_datetime(row["played_at"])
+
+                # Extract time components for dim_date
+                year = played_at.year
+                month = played_at.month
+                hour_of_day = played_at.hour
+                day_of_week = played_at.day_name()
+
+                date_key = upsert_date(cursor, year, month, hour_of_day, day_of_week)
 
                 if date_key:
                     insert_fact_play_summary(
@@ -50,10 +58,14 @@ def load_to_postgres(df: pd.DataFrame):
                         song_key,
                         artist_key,
                         date_key,
+                        row["played_at"],
                         1,
                         row["song_duration_ms"],
                     )
-                    logger.debug(f"Inserted fact for song_id={row['song_id']}, artist_id={row['artist_id']}")
+                    logger.debug(
+                        f"Inserted fact for song_id={row['song_id']}, "
+                        f"artist_id={row['artist_id']} at {row['played_at']}"
+                    )
             except Exception as e:
                 logger.error(f"Failed to process row {idx}", exc_info=True)
                 raise

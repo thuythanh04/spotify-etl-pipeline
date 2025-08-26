@@ -33,7 +33,8 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - ./etl:/opt/airflow/etl
+    - ./etl/recently_played:/opt/airflow/etl/recently_played
+    - ./etl/utils:/opt/airflow/etl/utils
     - ./config.py:/opt/airflow/config.py
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -332,9 +333,27 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+  
+  metabase:
+    image: metabase/metabase:latest
+    restart: always
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${MB_DB_DBNAME}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER}
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_DB_HOST: postgres
+    ports:
+      - "3008:3000"
+    depends_on:
+      - postgres
+    volumes:
+      - metabase_data:/metabase-data
 
 volumes:
   pgdata:
   minio_data:
   pgadmindata:
   postgres-db-volume:
+  metabase_data:

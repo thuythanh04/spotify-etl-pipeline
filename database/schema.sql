@@ -34,9 +34,10 @@ CREATE TABLE IF NOT EXISTS fact_play_summary (
     date_key INT REFERENCES dim_date (date_key),
     play_count INT NOT NULL DEFAULT 1,
     total_duration_ms BIGINT NOT NULL,
-    CONSTRAINT unique_play_summary UNIQUE (
+    played_at TIMESTAMP NOT NULL,
+    UNIQUE (
         song_key,
         artist_key,
-        date_key
+        played_at
     )
 );

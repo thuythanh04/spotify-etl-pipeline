@@ -1,9 +1,9 @@
 import logging
 import json, datetime, requests
 from io import BytesIO
-from minio import Minio
-from config import MINIO_ACCESS_KEY, MINIO_BUCKET, MINIO_ENDPOINT, MINIO_SECRET_KEY
+from config import MINIO_BUCKET
 from etl.utils.spotify_auth import refresh_access_token
+from etl.utils.minio_utils import init_minio_client
 
 # ---------- Logging Setup ----------
 logging.basicConfig(
@@ -17,11 +17,17 @@ def get_access_token() -> str:
     logging.info("Spotify access token retrieved")
     return token
 
-def get_yesterday_timestamp_ms() -> tuple[int, datetime.datetime]:
-    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-    yesterday_midnight = datetime.datetime(year=yesterday.year, month=yesterday.month, day=yesterday.day)
-    logging.info(f"Computed yesterday's timestamp: {yesterday_midnight}")
-    return int(yesterday_midnight.timestamp() * 1000), yesterday
+def get_last_window_timestamp_ms(hours: int = 12) -> tuple[int, datetime.datetime]:
+    """
+    Returns the timestamp (ms) for the start of the last ETL window,
+    based on the given interval in hours.
+    """
+    now = datetime.datetime.now()
+    window_start = now - datetime.timedelta(hours=hours)
+
+    logging.info(f"Computed ETL window start: {window_start}")
+    return int(window_start.timestamp() * 1000), window_start
+
 
 def fetch_recently_played(after_ms: int, access_token: str) -> list[dict]:
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -44,18 +50,22 @@ def fetch_recently_played(after_ms: int, access_token: str) -> list[dict]:
         for item in items
     ]
 
-def init_minio_client() -> Minio:
-    logging.info(f"Initializing MinIO client to endpoint {MINIO_ENDPOINT}")
-    return Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY, secret_key=MINIO_SECRET_KEY, secure=False)
-
-def upload_raw(records: list[dict], yesterday_date: datetime.datetime):
+def upload_raw(records: list[dict], yesterday_date):
     client = init_minio_client()
-    date_prefix = yesterday_date.strftime("%Y/%m/%d")
+
+    if isinstance(yesterday_date, str):
+        # If string, assume it's already like "2024/08/22"
+        date_prefix = yesterday_date
+    else:
+        # If datetime, format it
+        date_prefix = yesterday_date.strftime("%Y-%m-%d-%H")
+
     path = f"raw/{date_prefix}/recently_played.json"
     data_bytes = json.dumps(records, indent=2).encode("utf-8")
     client.put_object(MINIO_BUCKET, path, BytesIO(data_bytes), length=len(data_bytes), content_type="application/json")
     logging.info(f"Uploaded {len(records)} records to MinIO at {path}")
     return date_prefix
+
 
 def write_success_marker(bucket: str, date_prefix: str):
     client = init_minio_client()
