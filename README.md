@@ -59,7 +59,7 @@ spotify-etl-pipeline/
 
 **ETL Layer**
 
-- **Extract** – Fetch Spotify data and save raw CSV in **MinIO**.
+- **Extract** – Fetch Spotify data and save raw JSON in **MinIO**.
 - **Transform** – Clean and normalize data; save Parquet in **MinIO**.
 - **Load (Processed)**: Save processed data as Parquet in MinIO and load into PostgreSQL tables:
   - `dim_artist`
@@ -74,7 +74,7 @@ spotify-etl-pipeline/
 
 **MinIO (Object Storage)**
 
-- Stores raw JSON/CSV dumps and processed Parquet files.
+- Stores raw JSON dumps and processed Parquet files.
 - Ensures replayability, recovery, and reproducibility.
 
 **Metabase (Visualization)**
@@ -90,13 +90,15 @@ spotify-etl-pipeline/
 
 ## Pipeline Steps
 
-**Extract** – Fetch Spotify data and save raw CSV in **MinIO**.  
+**Extract** – Fetch Spotify data and save raw JSON in **MinIO**.  
 **Transform** – Clean and normalize data; save Parquet in **MinIO**.  
 **Load** – Load processed Parquet into **PostgreSQL** (`dim_artist`, `dim_song`, `dim_date`, `fact_play_summary`).  
 **Visualize** – Explore data with **Metabase**.  
 **Recommend** – Suggest tracks using audio features and listening history.
 
 ## Table Descriptions
+
+![Spotify Dashboard](assets/schema.png)
 
 ### Dimensions
 
@@ -138,7 +140,7 @@ Fill in:
 ## 📊 Dashboards
 
 Metabase visualizes:
-![Spotify Dashboard](assets/spotify_dashboard.png)
+![Spotify Dashboard](assets/dashboard.jpg)
 
 ---
 
