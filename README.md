@@ -57,7 +57,7 @@ spotify-etl-pipeline/
 - Scheduled runs ensure data freshness.
 - Integrated logging and monitoring.
 - Example DAG screenshot:
-  ![Airflow DAG Example](assets/recently_played_dag-graph.png)
+  ![Spotify ETL DAG Demo](assets/demo_dag_hd.gif)
 
 **ETL Layer**
 
