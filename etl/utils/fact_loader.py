@@ -8,7 +8,7 @@ def insert_fact_play_summary(cur, song_key, artist_key, date_key, played_at, pla
         DO UPDATE
         SET play_count = fact_play_summary.play_count + EXCLUDED.play_count,
             total_duration_ms = fact_play_summary.total_duration_ms + EXCLUDED.total_duration_ms,
-            played_at = GREATEST(fact_play_summary.played_at, EXCLUDED.played_at);
+            played_at = GREATEST(fact_play_summary.played_at, EXCLUDED.played_at)
         RETURNING play_id;
     """, (song_key, artist_key, date_key, played_at, play_count, total_duration_ms))
     return cur.fetchone()[0]

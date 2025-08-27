@@ -19,19 +19,19 @@ def upsert_song(cur, song_id, song_title, song_duration_ms):
     """, (song_id, song_title, song_duration_ms))
     return cur.fetchone()[0]
 
-def upsert_date(cur, year, month, hour_of_day, day_of_week):
+def upsert_date(cur, year, month, day, hour_of_day, day_of_week):
     cur.execute("""
-        INSERT INTO dim_date (year, month, hour_of_day, day_of_week)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (year, month, hour_of_day, day_of_week) DO NOTHING
+        INSERT INTO dim_date (year, month, day, hour_of_day, day_of_week)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (year, month, day, hour_of_day, day_of_week) DO NOTHING
         RETURNING date_key;
-    """, (year, month, hour_of_day, day_of_week))
+    """, (year, month, day, hour_of_day, day_of_week))
     result = cur.fetchone()
     if result is not None:
         return result[0]
     # If not inserted, fetch the existing key
     cur.execute("""
         SELECT date_key FROM dim_date
-        WHERE year = %s AND month = %s AND hour_of_day = %s AND day_of_week = %s;
-    """, (year, month, hour_of_day, day_of_week))
+        WHERE year = %s AND month = %s AND day = %s AND hour_of_day = %s AND day_of_week = %s;
+    """, (year, month, day, hour_of_day, day_of_week))
     return cur.fetchone()[0]

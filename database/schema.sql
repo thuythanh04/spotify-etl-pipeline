@@ -16,11 +16,13 @@ CREATE TABLE IF NOT EXISTS dim_date (
     date_key BIGSERIAL PRIMARY KEY,
     year INT,
     month INT,
+    day INT,
     hour_of_day INT,
     day_of_week VARCHAR,
     CONSTRAINT unique_date_time UNIQUE (
         year,
         month,
+        day,
         hour_of_day,
         day_of_week
     )
@@ -34,7 +36,7 @@ CREATE TABLE IF NOT EXISTS fact_play_summary (
     date_key BIGINT REFERENCES dim_date (date_key),
     play_count BIGINT NOT NULL DEFAULT 0,
     total_duration_ms BIGINT NOT NULL DEFAULT 0,
-    played_at TIMESTAMP UNIQUE,
+    played_at TIMESTAMPTZ NOT NULL,
     UNIQUE (
         song_key,
         artist_key,

@@ -68,10 +68,11 @@ def load_to_postgres(df: pd.DataFrame):
                 # Extract date components safely
                 year = safe_int(played_at.year)
                 month = safe_int(played_at.month)
+                day = safe_int(played_at.day)
                 hour_of_day = safe_int(played_at.hour)
                 day_of_week = played_at.day_name() if pd.notna(played_at) else "Unknown"
 
-                date_key = upsert_date(cursor, year, month, hour_of_day, day_of_week)
+                date_key = upsert_date(cursor, year, month, day, hour_of_day, day_of_week)
 
                 if date_key:
                     insert_fact_play_summary(

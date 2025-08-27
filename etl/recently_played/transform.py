@@ -62,17 +62,22 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     df = validate_and_clean(df)
 
     df["song_duration_ms"] = df["song_duration_ms"].astype(int)
-    df["played_at"] = pd.to_datetime(df["played_at"], errors="coerce")
+
+    # Ensure UTC timezone-awareness
+    df["played_at"] = pd.to_datetime(df["played_at"], errors="coerce", utc=True)
 
     before = len(df)
     df = df.drop_duplicates(subset=["song_id", "played_at"])
     after = len(df)
     logger.info(f"Removed {before - after} duplicate rows; {after} rows remain")
 
-    df["year"] = df["played_at"].dt.year
-    df["month"] = df["played_at"].dt.month
-    df["hour_of_day"] = df["played_at"].dt.hour
-    df["day_of_week"] = df["played_at"].dt.day_name()
+    # Add local-time derived fields (VN)
+    df["played_at_local"] = df["played_at"].dt.tz_convert("Asia/Ho_Chi_Minh")
+    df["year"] = df["played_at_local"].dt.year
+    df["month"] = df["played_at_local"].dt.month
+    df["day"] = df["played_at_local"].dt.day
+    df["hour_of_day"] = df["played_at_local"].dt.hour
+    df["day_of_week"] = df["played_at_local"].dt.day_name()
 
     logger.info("Transformation complete")
     return df

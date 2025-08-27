@@ -1,5 +1,6 @@
 import logging
 import json, datetime, requests
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from config import MINIO_BUCKET
 from etl.utils.spotify_auth import refresh_access_token
@@ -17,13 +18,14 @@ def get_access_token() -> str:
     logging.info("Spotify access token retrieved")
     return token
 
-def get_last_window_timestamp_ms(hours: int = 12) -> tuple[int, datetime.datetime]:
+def get_last_window_timestamp_ms(hours: int = 12) -> tuple[int, datetime]:
     """
     Returns the timestamp (ms) for the start of the last ETL window,
     based on the given interval in hours.
     """
-    now = datetime.datetime.now()
-    window_start = now - datetime.timedelta(hours=hours)
+
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(hours=hours)
 
     logging.info(f"Computed ETL window start: {window_start}")
     return int(window_start.timestamp() * 1000), window_start
