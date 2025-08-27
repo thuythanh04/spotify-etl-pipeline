@@ -32,12 +32,12 @@ CREATE TABLE IF NOT EXISTS fact_play_summary (
     song_key BIGINT REFERENCES dim_song (song_key),
     artist_key BIGINT REFERENCES dim_artist (artist_key),
     date_key BIGINT REFERENCES dim_date (date_key),
-    play_count BIGINT NOT NULL DEFAULT 1,
-    total_duration_ms BIGINT NOT NULL,
-    played_at TIMESTAMP NOT NULL,
+    play_count BIGINT NOT NULL DEFAULT 0,
+    total_duration_ms BIGINT NOT NULL DEFAULT 0,
+    played_at TIMESTAMP UNIQUE,
     UNIQUE (
         song_key,
         artist_key,
-        played_at
+        date_key
     )
 );
