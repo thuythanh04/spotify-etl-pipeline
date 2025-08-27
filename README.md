@@ -2,7 +2,7 @@
 
 Designed and implemented a Spotify ETL pipeline using Airflow, MinIO, Postgres, and Metabase. Built a recommendation engine on top of structured data to suggest new tracks, demonstrating skills in data orchestration, data warehousing, and analytics engineering.
 
-**Note:** This project is a work in progress and not yet complete.
+**Note:** The core pipeline is functional; recommendation engine is being extended.
 
 ## Overview
 
@@ -56,12 +56,14 @@ spotify-etl-pipeline/
 - DAGs manage ETL jobs: **Extract → Transform → Load**.
 - Scheduled runs ensure data freshness.
 - Integrated logging and monitoring.
+- Example DAG screenshot:
+  ![Airflow DAG Example](assets/recently_played_dag-graph.png)
 
 **ETL Layer**
 
 - **Extract** – Fetch Spotify data and save raw JSON in **MinIO**.
 - **Transform** – Clean and normalize data; save Parquet in **MinIO**.
-- **Load (Processed)**: Save processed data as Parquet in MinIO and load into PostgreSQL tables:
+- **Load (Processed)**: Load processed data as Parquet in MinIO into PostgreSQL tables:
   - `dim_artist`
   - `dim_song`
   - `dim_date`
@@ -102,11 +104,11 @@ spotify-etl-pipeline/
 
 ### Dimensions
 
-| Table      | Columns                                              | Description                                |
-| ---------- | ---------------------------------------------------- | ------------------------------------------ |
-| dim_artist | artist_key (PK), artist_id, artist_name              | Stores unique artists.                     |
-| dim_song   | song_key (PK), song_id, song_title, song_duration_ms | Stores unique songs and their duration.    |
-| dim_date   | date_key (PK), year, month, hour_of_day, day_of_week | Stores date and time attributes for plays. |
+| Table      | Columns                                                   | Description                                |
+| ---------- | --------------------------------------------------------- | ------------------------------------------ |
+| dim_artist | artist_key (PK), artist_id, artist_name                   | Stores unique artists.                     |
+| dim_song   | song_key (PK), song_id, song_title, song_duration_ms      | Stores unique songs and their duration.    |
+| dim_date   | date_key (PK), year, month, day, hour_of_day, day_of_week | Stores date and time attributes for plays. |
 
 ### Fact
 
@@ -141,6 +143,7 @@ Fill in:
 
 Metabase visualizes:
 ![Spotify Dashboard](assets/dashboard.jpg)
+Some dashboard views, such as the weekend vs weekday trend, are incomplete due to insufficient weekend data.
 
 ---
 

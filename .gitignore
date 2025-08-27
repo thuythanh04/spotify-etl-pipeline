@@ -1,6 +1,5 @@
 .venv
 .env
-*data
 *__pycache__
 auth.py
 logs/
