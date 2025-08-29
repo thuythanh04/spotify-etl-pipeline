@@ -2,8 +2,6 @@
 
 Designed and implemented a Spotify ETL pipeline using Airflow, MinIO, Postgres, and Metabase. Built a recommendation engine on top of structured data to suggest new tracks, demonstrating skills in data orchestration, data warehousing, and analytics engineering.
 
-**Note:** The core pipeline is functional; recommendation engine is being extended.
-
 ## Overview
 
 - **Apache Airflow** → Workflow orchestration and scheduling of ETL jobs
@@ -118,7 +116,7 @@ spotify-etl-pipeline/
 
 ---
 
-<!-- ## Setup
+## Setup
 
 ### 1️ Clone
 
@@ -127,7 +125,13 @@ git clone https://github.com/thuythanh04/spotify-etl-pipeline.git
 cd spotify-etl-pipeline
 ```
 
-### 2 Configure Environment
+### 2 Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3 Configure Environment
 
 ```bash
 cp example.env .env
@@ -137,7 +141,24 @@ Fill in:
 
 - Spotify API credentials
 - Postgres connection
-- Metabase configs -->
+- Metabase/ Airflow configs
+
+### 4 Build images and run the services.
+
+```bash
+  make build
+  make up
+```
+
+### 5 Access the Services
+
+Airflow Webserver → http://localhost:8080
+
+Metabase → http://localhost:3008
+
+PgAdmin → http://localhost:8082
+
+MinIO Console → http://localhost:9001
 
 ## 📊 Dashboards
 
@@ -166,6 +187,11 @@ The recommendation engine is an extension of the ETL pipeline that suggests new 
 
 - **Spotify API (`recently_played`)** → recent tracks for the user.
 - **SpotifyFeatures.csv** (static dataset) → track metadata.
+
+#### Dataset Structure (SpotifyFeatures.csv)
+
+- **Identifiers**: `track_id`, `track_name`, `artist_name`, `genre`, `popularity`
+- **Audio Features**: `acousticness`, `danceability`, `energy`, `valence`, `tempo`, `duration_ms`, `loudness`, `instrumentalness`, `speechiness`, `liveness`, `key`, `mode`, `time_signature`
 
 ---
 
