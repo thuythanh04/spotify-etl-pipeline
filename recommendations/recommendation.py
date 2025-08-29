@@ -130,7 +130,7 @@ def save_recommendations(recommendations, conn):
     with conn.cursor() as cur:
         for rank, (track, artist) in enumerate(recommendations, start=1):
             cur.execute("""
-                INSERT INTO fact_recommendation (
+                INSERT INTO recommendation_list (
                     track_name, artist_name, recommended_at,
                     week_of_year, year, rank
                 )
@@ -147,7 +147,7 @@ def save_recommendations(recommendations, conn):
 
     conn.commit()
     print(f"✅ Saved {saved} recommendations, skipped {skipped} (duplicates).")
-    
+
 if __name__ == "__main__":
     spotify_features = load_spotify_features("data/SpotifyFeatures.csv")
     recent_df = get_recently_played()

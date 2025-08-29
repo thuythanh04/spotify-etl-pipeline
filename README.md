@@ -147,4 +147,110 @@ Some dashboard views, such as the weekend vs weekday trend, are incomplete due t
 
 ---
 
-## Recommendations (Work in Progress)
+## Recommendations
+
+The recommendation engine is an extension of the ETL pipeline that suggests new tracks based on recent listening history and track-level audio features.
+
+## Features
+
+- Extract recent listening history from **Spotify API** (`recently_played` endpoint).
+- Enrich tracks with **Spotify audio features** (energy, valence, tempo, etc.).
+- Construct a **taste profile** using recent plays with **recency weighting**.
+- Recommend **Top N new songs** most similar to the playlist profile.
+- Store results in a dedicated table (`recommendation_list`) for dashboards.
+- Visualize weekly recommendation charts in **Metabase**.
+
+## Design
+
+### 1. Input Data Sources
+
+- **Spotify API (`recently_played`)** → recent tracks for the user.
+- **SpotifyFeatures.csv** (static dataset) → track metadata.
+
+---
+
+### 2. Feature Engineering
+
+- **Numerical features**:  
+  `danceability`, `energy`, `loudness`, `speechiness`, `acousticness`,  
+  `instrumentalness`, `liveness`, `valence`, `tempo`, `duration_ms`.
+
+- **Categorical features**:  
+  `key`, `genre` → transformed via one-hot encoding.
+
+- **Normalization**: all features scaled (MinMaxScaler) for fair similarity comparisons.
+
+---
+
+### 3. Recency Weighting
+
+We apply an exponential decay so that recently played songs have more influence:
+
+            weight = exp(- Δt / τ)
+
+- Δt = time since track was played
+- τ = decay constant (e.g., 7 days)
+
+```python
+# Exponential decay weights by recency (τ = 1 day in this example)
+playlist_df["weight"] = np.exp(
+    -(now - playlist_df["played_at"]).dt.total_seconds() / (3600 * 24)
+)
+```
+
+---
+
+### 4. Playlist Vector Construction
+
+- Each song = high-dimensional **feature vector**.
+- User’s **taste profile** = weighted average of recent plays.
+
+---
+
+### 5. Similarity Computation
+
+- Compute **cosine similarity** between playlist vector and candidate tracks.
+- Exclude tracks already in the recent history.
+- Rank songs by similarity score.
+
+Playlist Vector Example:
+
+![Playlist Vector Example](assets/playlist_vector.png)
+
+- Recommendations = find songs closest to User Vetor.
+
+---
+
+### 6. Output
+
+- **Top N recommended songs** (e.g., 10–20).
+- Stored in **PostgreSQL table**: `recommendation_list`.
+- Integrated into **Metabase dashboards** for visualization.
+
+---
+
+## 📈 Example Flow
+
+1. User plays **Song A, Song B, Song C**.
+2. Extract their **audio features**.
+3. Compute **playlist vector** (weighted by recency).
+4. Compare playlist vector to all songs in `SpotifyFeatures.csv`.
+5. Recommend **new songs** closest in cosine similarity.
+
+### Table: recommendation_list
+
+| Column         | Type      | Description                                |
+| -------------- | --------- | ------------------------------------------ |
+| rec_id (PK)    | SERIAL    | Unique recommendation ID                   |
+| track_name     | TEXT      | Recommended track name                     |
+| artist_name    | TEXT      | Recommended artist name                    |
+| rank           | INT       | Position of the recommendation in the list |
+| recommended_at | TIMESTAMP | Timestamp when recommendation was made     |
+| year           | INT       | Extracted year of recommendation           |
+| week_of_year   | INT       | ISO week number of recommendation          |
+
+---
+
+## Weekly Recommended Songs Dashboard
+
+![Weekly Recommended Songs Dashboard](assets/Metabase_Weekly_Recommended_Songs.jpg)
