@@ -43,3 +43,20 @@ CREATE TABLE IF NOT EXISTS fact_play_summary (
         date_key
     )
 );
+
+-- Recommendation
+CREATE TABLE IF NOT EXISTS recommendation_list (
+    rec_id BIGSERIAL PRIMARY KEY,
+    track_name TEXT NOT NULL,
+    artist_name TEXT NOT NULL,
+    recommended_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    week_of_year INT NOT NULL,
+    year INT NOT NULL,
+    rank INT NOT NULL,
+    UNIQUE (
+        track_name,
+        artist_name,
+        week_of_year,
+        year
+    )
+);

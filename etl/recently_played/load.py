@@ -62,15 +62,13 @@ def load_to_postgres(df: pd.DataFrame):
                 artist_key = upsert_artist(cursor, artist_id, artist_name)
                 song_key = upsert_song(cursor, song_id, song_title, song_duration_ms)
 
-                # Convert played_at to datetime
-                played_at = pd.to_datetime(row["played_at"])
+                played_at = row["played_at"]   # already datetime (UTC)
 
-                # Extract date components safely
-                year = safe_int(played_at.year)
-                month = safe_int(played_at.month)
-                day = safe_int(played_at.day)
-                hour_of_day = safe_int(played_at.hour)
-                day_of_week = played_at.day_name() if pd.notna(played_at) else "Unknown"
+                year = safe_int(row["year"])
+                month = safe_int(row["month"])
+                day = safe_int(row["day"])
+                hour_of_day = safe_int(row["hour_of_day"])
+                day_of_week = row.get("day_of_week", "Unknown")
 
                 date_key = upsert_date(cursor, year, month, day, hour_of_day, day_of_week)
 
