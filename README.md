@@ -163,8 +163,7 @@ MinIO Console → http://localhost:9001
 ## 📊 Dashboards
 
 Metabase visualizes:
-![Spotify Dashboard](assets/dashboard.jpg)
-Some dashboard views, such as the weekend vs weekday trend, are incomplete due to insufficient weekend data.
+![Spotify Dashboard](assets/spotify_dashborad.jpg)
 
 ---
 
