@@ -17,8 +17,8 @@ SELECT
         ELSE 'Weekday'
     END AS day_type,
     d.hour_of_day,
-    SUM(f.play_count) AS total_plays,
-    SUM(f.total_duration_ms) / 60000 AS total_minutes
+    AVG(f.play_count) AS avg_plays_per_day,
+    AVG(f.total_duration_ms) / 60000 AS avg_minutes_per_day
 FROM
     fact_play_summary f
     JOIN dim_date d ON f.date_key = d.date_key

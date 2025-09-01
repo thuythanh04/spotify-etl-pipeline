@@ -6,7 +6,7 @@ Designed and implemented a Spotify ETL pipeline using Airflow, MinIO, Postgres, 
 
 - **Apache Airflow** → Workflow orchestration and scheduling of ETL jobs
 - **MinIO** → Object storage for raw JSON data and backups
-- **PostgreSQL** → Central data warehouse for transformed data
+- **PostgreSQL** → Central store for structured, query-ready data
 - **Metabase** → Interactive dashboards for data visualization and insights
 - **Docker Compose** → Containerized deployment of all services
 - **Recommendation Engine** → Suggests new tracks based on recent plays and audio features (`SpotifyFeatures.csv`)
@@ -61,13 +61,13 @@ spotify-etl-pipeline/
 
 - **Extract** – Fetch Spotify data and save raw JSON in **MinIO**.
 - **Transform** – Clean and normalize data; save Parquet in **MinIO**.
-- **Load (Processed)**: Load processed data as Parquet in MinIO into PostgreSQL tables:
+- **Load (Processed)**: Load (Processed): Store cleaned data as Parquet in MinIO for efficient reuse, and insert structured records into PostgreSQL tables (star schema) for analytics:
   - `dim_artist`
   - `dim_song`
   - `dim_date`
   - `fact_play_summary`
 
-**PostgreSQL (Data Warehouse)**
+**PostgreSQL**
 
 - Central store for structured and queryable data.
 - Optimized schema for analytics and recommendation queries.
@@ -92,7 +92,7 @@ spotify-etl-pipeline/
 
 **Extract** – Fetch Spotify data and save raw JSON in **MinIO**.  
 **Transform** – Clean and normalize data; save Parquet in **MinIO**.  
-**Load** – Load processed Parquet into **PostgreSQL** (`dim_artist`, `dim_song`, `dim_date`, `fact_play_summary`).  
+**Load** – + **Load** – Insert structured records into **PostgreSQL** (`dim_artist`, `dim_song`, `dim_date`, `fact_play_summary`),
 **Visualize** – Explore data with **Metabase**.  
 **Recommend** – Suggest tracks using audio features and listening history.
 
