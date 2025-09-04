@@ -61,7 +61,7 @@ spotify-etl-pipeline/
 
 - **Extract** – Fetch Spotify data and save raw JSON in **MinIO**.
 - **Transform** – Clean and normalize data; save Parquet in **MinIO**.
-- **Load (Processed)**: Load (Processed): Store cleaned data as Parquet in MinIO for efficient reuse, and insert structured records into PostgreSQL tables (star schema) for analytics:
+- **Load (Processed)**: Store cleaned data as Parquet in MinIO for efficient reuse, and insert structured records into PostgreSQL tables (star schema) for analytics:
   - `dim_artist`
   - `dim_song`
   - `dim_date`
@@ -92,7 +92,7 @@ spotify-etl-pipeline/
 
 **Extract** – Fetch Spotify data and save raw JSON in **MinIO**.  
 **Transform** – Clean and normalize data; save Parquet in **MinIO**.  
-**Load** – + **Load** – Insert structured records into **PostgreSQL** (`dim_artist`, `dim_song`, `dim_date`, `fact_play_summary`),
+**Load** – Insert structured records into **PostgreSQL** (`dim_artist`, `dim_song`, `dim_date`, `fact_play_summary`),
 **Visualize** – Explore data with **Metabase**.  
 **Recommend** – Suggest tracks using audio features and listening history.
 
